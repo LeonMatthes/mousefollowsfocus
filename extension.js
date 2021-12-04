@@ -1,20 +1,16 @@
-const St = imports.gi.St;
-const Gio = imports.gi.Gio;
-const Gdk = imports.gi.Gdk;
 const Clutter = imports.gi.Clutter;
 
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
 const EXT_NAME = `[${Me.metadata.name}]`;
 
-const GLib = imports.gi.GLib;
 const Meta = imports.gi.Meta;
 const overview = imports.ui.main.overview;
 
 
 function get_window_actor(window) {
     for (const actor of global.get_window_actors()) {
-        if(!actor.is_destroyed() && actor.get_meta_window() === window) {
+        if (!actor.is_destroyed() && actor.get_meta_window() === window) {
             return actor;
         }
     }
@@ -33,28 +29,26 @@ function cursor_within_rect(mouse_x, mouse_y, rect) {
 const DEBUGGING = false;
 
 function dbg_log(message) {
-    if(DEBUGGING) {
+    if (DEBUGGING) {
         log(EXT_NAME, message);
     }
 }
 
 function focus_changed(win) {
     const actor = get_window_actor(win);
-    dbg_log("window focus event received");
-    if(actor) {
+    dbg_log('window focus event received');
+    if (actor) {
         let rect = win.get_frame_rect();
 
         let seat = Clutter.get_default_backend().get_default_seat();
-        let [mouse_x, mouse_y, mouse_mask] = global.get_pointer();
+        let [mouse_x, mouse_y, _] = global.get_pointer();
 
-        if(cursor_within_rect(mouse_x, mouse_y, rect)) {
-            dbg_log("pointer within window, discarding event");
-        }
-        else if(overview.visible) {
-            dbg_log("overview visible, discarding event");
-        }
-        else {
-            dbg_log("targeting new window");
+        if (cursor_within_rect(mouse_x, mouse_y, rect)) {
+            dbg_log('pointer within window, discarding event');
+        } else if (overview.visible) {
+            dbg_log('overview visible, discarding event');
+        } else {
+            dbg_log('targeting new window');
             seat.warp_pointer(rect.x + rect.width / 2, rect.y + rect.height / 2);
         }
 
@@ -63,7 +57,7 @@ function focus_changed(win) {
 
 function connect_to_window(win) {
     const type = win.get_window_type();
-    if(type != Meta.WindowType.NORMAL) {
+    if (type !== Meta.WindowType.NORMAL) {
         dbg_log(`ignoring window, window type: ${type}`);
         return;
     }
@@ -79,7 +73,7 @@ class Extension {
         dbg_log(`enabling ${Me.metadata.name}`);
 
         for (const actor of global.get_window_actors()) {
-            if(actor.is_destroyed()) {
+            if (actor.is_destroyed()) {
                 continue;
             }
 
@@ -92,7 +86,6 @@ class Extension {
 
             connect_to_window(win);
         });
-
     }
 
     // REMINDER: It's required for extensions to clean up after themselves when
@@ -111,12 +104,11 @@ class Extension {
             }
 
             const win = actor.get_meta_window();
-            if(win._mousefollowsfocus_extension_signal) {
+            if (win._mousefollowsfocus_extension_signal) {
                 win.disconnect(win._mousefollowsfocus_extension_signal);
                 delete win._mousefollowsfocus_extension_signal;
             }
         }
-
     }
 }
 
