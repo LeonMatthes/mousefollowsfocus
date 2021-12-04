@@ -5,10 +5,12 @@ const Clutter = imports.gi.Clutter;
 
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
+const EXT_NAME = `[${Me.metadata.name}]`;
 
 const GLib = imports.gi.GLib;
 const Meta = imports.gi.Meta;
 const overview = imports.ui.main.overview;
+
 
 function get_window_actor(window) {
     for (const actor of global.get_window_actors()) {
@@ -29,7 +31,7 @@ function cursor_within_rect(mouse_x, mouse_y, rect) {
 
 function focus_changed(win) {
     const actor = get_window_actor(win);
-    log(`window focus event received`);
+    log(EXT_NAME, "window focus event received");
     if(actor) {
         let rect = win.get_frame_rect();
 
@@ -37,13 +39,13 @@ function focus_changed(win) {
         let [mouse_x, mouse_y, mouse_mask] = global.get_pointer();
 
         if(cursor_within_rect(mouse_x, mouse_y, rect)) {
-            log(`pointer within window, discarding event`);
+            log(EXT_NAME, "pointer within window, discarding event");
         }
         else if(overview.visible) {
-            log(`overview visible, discarding event`);
+            log(EXT_NAME, "overview visible, discarding event");
         }
         else {
-            log(`targeting new window`);
+            log(EXT_NAME, "targeting new window");
             seat.warp_pointer(rect.x + rect.width / 2, rect.y + rect.height / 2);
         }
 
@@ -53,7 +55,7 @@ function focus_changed(win) {
 function connect_to_window(win) {
     const type = win.get_window_type();
     if(type != Meta.WindowType.NORMAL) {
-        log(`ignoring window, window type: ${type}`);
+        log(EXT_NAME, `ignoring window, window type: ${type}`);
         return;
     }
 
@@ -65,7 +67,7 @@ class Extension {
     }
 
     enable() {
-        log(`enabling ${Me.metadata.name}`);
+        log(EXT_NAME, `enabling ${Me.metadata.name}`);
 
         for (const actor of global.get_window_actors()) {
             if(actor.is_destroyed()) {
@@ -77,7 +79,7 @@ class Extension {
         }
 
         this.create_signal = global.display.connect('window-created', function (ignore, win) {
-            log(`window created ${win}`);
+            log(EXT_NAME, `window created ${win}`);
 
             connect_to_window(win);
         });
@@ -87,7 +89,7 @@ class Extension {
     // REMINDER: It's required for extensions to clean up after themselves when
     // they are disabled. This is required for approval during review!
     disable() {
-        log(`disabling ${Me.metadata.name}`);
+        log(EXT_NAME, `disabling ${Me.metadata.name}`);
 
         if (this.create_signal !== undefined) {
             global.display.disconnect(this.create_signal);
@@ -111,7 +113,7 @@ class Extension {
 
 
 function init() {
-    log(`initializing ${Me.metadata.name}`);
+    log(EXT_NAME, `initializing ${Me.metadata.name}`);
 
     return new Extension();
 }
