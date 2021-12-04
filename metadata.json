@@ -1,0 +1,8 @@
+{
+  "name": "Mouse Follows Focus",
+  "description": "Move the mouse to the currently focused window whenever the focus changes",
+  "uuid": "mousefollowsfocus@matthes.biz",
+  "shell-version": [
+    "41"
+  ]
+}
