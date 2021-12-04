@@ -29,9 +29,18 @@ function cursor_within_rect(mouse_x, mouse_y, rect) {
         mouse_y <= rect.y + rect.height;
 }
 
+// logging disabled by default
+const DEBUGGING = false;
+
+function dbg_log(message) {
+    if(DEBUGGING) {
+        log(EXT_NAME, message);
+    }
+}
+
 function focus_changed(win) {
     const actor = get_window_actor(win);
-    log(EXT_NAME, "window focus event received");
+    dbg_log("window focus event received");
     if(actor) {
         let rect = win.get_frame_rect();
 
@@ -39,13 +48,13 @@ function focus_changed(win) {
         let [mouse_x, mouse_y, mouse_mask] = global.get_pointer();
 
         if(cursor_within_rect(mouse_x, mouse_y, rect)) {
-            log(EXT_NAME, "pointer within window, discarding event");
+            dbg_log("pointer within window, discarding event");
         }
         else if(overview.visible) {
-            log(EXT_NAME, "overview visible, discarding event");
+            dbg_log("overview visible, discarding event");
         }
         else {
-            log(EXT_NAME, "targeting new window");
+            dbg_log("targeting new window");
             seat.warp_pointer(rect.x + rect.width / 2, rect.y + rect.height / 2);
         }
 
@@ -55,7 +64,7 @@ function focus_changed(win) {
 function connect_to_window(win) {
     const type = win.get_window_type();
     if(type != Meta.WindowType.NORMAL) {
-        log(EXT_NAME, `ignoring window, window type: ${type}`);
+        dbg_log(`ignoring window, window type: ${type}`);
         return;
     }
 
@@ -67,7 +76,7 @@ class Extension {
     }
 
     enable() {
-        log(EXT_NAME, `enabling ${Me.metadata.name}`);
+        dbg_log(`enabling ${Me.metadata.name}`);
 
         for (const actor of global.get_window_actors()) {
             if(actor.is_destroyed()) {
@@ -79,7 +88,7 @@ class Extension {
         }
 
         this.create_signal = global.display.connect('window-created', function (ignore, win) {
-            log(EXT_NAME, `window created ${win}`);
+            dbg_log(`window created ${win}`);
 
             connect_to_window(win);
         });
@@ -89,7 +98,7 @@ class Extension {
     // REMINDER: It's required for extensions to clean up after themselves when
     // they are disabled. This is required for approval during review!
     disable() {
-        log(EXT_NAME, `disabling ${Me.metadata.name}`);
+        dbg_log(`disabling ${Me.metadata.name}`);
 
         if (this.create_signal !== undefined) {
             global.display.disconnect(this.create_signal);
@@ -113,7 +122,7 @@ class Extension {
 
 
 function init() {
-    log(EXT_NAME, `initializing ${Me.metadata.name}`);
+    dbg_log(`initializing ${Me.metadata.name}`);
 
     return new Extension();
 }
