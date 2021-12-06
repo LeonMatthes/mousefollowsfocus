@@ -24,10 +24,10 @@ function cursor_within_window(mouse_x, mouse_y, win) {
     // the pointer to jump around eratically.
     let rect = win.get_buffer_rect();
 
-    return mouse_x >= rect.x - margins &&
-        mouse_x <= rect.x + rect.width  + margins &&
-        mouse_y >= rect.y - margins &&
-        mouse_y <= rect.y + rect.height + margins;
+    return mouse_x >= rect.x &&
+        mouse_x <= rect.x + rect.width &&
+        mouse_y >= rect.y &&
+        mouse_y <= rect.y + rect.height;
 }
 
 // logging disabled by default
