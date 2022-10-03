@@ -24,6 +24,8 @@ function cursor_within_window(mouse_x, mouse_y, win) {
     // the pointer to jump around eratically.
     let rect = win.get_buffer_rect();
 
+    dbg_log(`window rect: ${rect.x}:${rect.y} - ${rect.width}:${rect.height}`);
+
     return mouse_x >= rect.x &&
         mouse_x <= rect.x + rect.width &&
         mouse_y >= rect.y &&
@@ -52,6 +54,10 @@ function focus_changed(win) {
             dbg_log('pointer within window, discarding event');
         } else if (overview.visible) {
             dbg_log('overview visible, discarding event');
+        } else if (rect.width < 10 && rect.height < 10) {
+            // xdg-copy creates a 1x1 pixel window to capture mouse events.
+            // Ignore this and similar windows.
+            dbg_log('window too small, discarding event');
         } else {
             dbg_log('targeting new window');
             seat.warp_pointer(rect.x + rect.width / 2, rect.y + rect.height / 2);
