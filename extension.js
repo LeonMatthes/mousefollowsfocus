@@ -33,7 +33,7 @@ function cursor_within_window(mouse_x, mouse_y, win) {
 }
 
 // logging disabled by default
-const DEBUGGING = false;
+const DEBUGGING = true;
 
 function dbg_log(message) {
     if (DEBUGGING) {
@@ -41,57 +41,82 @@ function dbg_log(message) {
     }
 }
 
-function focus_changed(win) {
-    const actor = get_window_actor(win);
-    dbg_log('window focus event received');
-    if (actor) {
-        let rect = win.get_buffer_rect();
-
-        let seat = Clutter.get_default_backend().get_default_seat();
-        let [mouse_x, mouse_y, _] = global.get_pointer();
-
-        if (cursor_within_window(mouse_x, mouse_y, win)) {
-            dbg_log('pointer within window, discarding event');
-        } else if (overview.visible) {
-            dbg_log('overview visible, discarding event');
-        } else if (rect.width < 10 && rect.height < 10) {
-            // xdg-copy creates a 1x1 pixel window to capture mouse events.
-            // Ignore this and similar windows.
-            dbg_log('window too small, discarding event');
-        } else {
-            dbg_log('targeting new window');
-            seat.warp_pointer(rect.x + rect.width / 2, rect.y + rect.height / 2);
-        }
-
-    }
-}
-
-function connect_to_window(win) {
-    const type = win.get_window_type();
-    if (type !== Meta.WindowType.NORMAL) {
-        dbg_log(`ignoring window, window type: ${type}`);
-        return;
-    }
-
-    win._mousefollowsfocus_extension_signal = win.connect('focus', focus_changed);
-}
-
-function get_focused_window() {
-    for (const actor of global.get_window_actors()) {
-        if (actor.is_destroyed()) {
-            continue;
-        }
-
-        const win = actor.get_meta_window();
-        if (win.has_focus()) {
-            return win;
-        }
-    }
-
-    return undefined;
-}
 
 class Extension {
+
+    focus_changed(win) {
+        const actor = get_window_actor(win);
+        dbg_log('window focus event received');
+        if (actor) {
+            let rect = win.get_buffer_rect();
+
+            let seat = Clutter.get_default_backend().get_default_seat();
+            let [mouse_x, mouse_y, _] = global.get_pointer();
+
+            let time_to_last_event = global.display.get_current_time_roundtrip() - this.last_mouse_event;
+
+            if (cursor_within_window(mouse_x, mouse_y, win)) {
+                dbg_log('pointer within window, discarding event');
+            } else if (overview.visible) {
+                dbg_log('overview visible, discarding event');
+            } else if (rect.width < 10 && rect.height < 10) {
+                // xdg-copy creates a 1x1 pixel window to capture mouse events.
+                // Ignore this and similar windows.
+                dbg_log('window too small, discarding event');
+            } else if (time_to_last_event < 500 /*ms*/) {
+                dbg_log("Recent pointer interaction, discarding event");
+            } else {
+                dbg_log('targeting new window');
+                seat.warp_pointer(rect.x + rect.width / 2, rect.y + rect.height / 2);
+            }
+
+        }
+    }
+
+    connect_to_window(win) {
+        const type = win.get_window_type();
+        if (type !== Meta.WindowType.NORMAL) {
+            dbg_log(`ignoring window, window type: ${type}`);
+            return;
+        }
+
+        win._mousefollowsfocus_extension_signal = win.connect('focus', this.focus_changed.bind(this));
+    }
+
+    get_focused_window() {
+        for (const actor of global.get_window_actors()) {
+            if (actor.is_destroyed()) {
+                continue;
+            }
+
+            const win = actor.get_meta_window();
+            if (win.has_focus()) {
+                return win;
+            }
+        }
+
+        return undefined;
+    }
+
+    event_filter(event) {
+        let device = event.get_device();
+        if(device) {
+            switch (device.get_device_type()) {
+                case Clutter.InputDeviceType.POINTER_DEVICE:
+                case Clutter.InputDeviceType.TOUCHPAD_DEVICE:
+                case Clutter.InputDeviceType.CURSOR_DEVICE:
+                    // Input from "mouse" detected
+                    this.last_mouse_event = global.display.get_current_time_roundtrip();
+                    dbg_log(`test: ${device.get_has_cursor()} event: ${this.last_mouse_event}`);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        return Clutter.EVENT_PROPAGATE;
+    }
+
     constructor() {
     }
 
@@ -104,23 +129,26 @@ class Extension {
             }
 
             const win = actor.get_meta_window();
-            connect_to_window(win);
+            this.connect_to_window(win);
         }
 
-        this.create_signal = global.display.connect('window-created', function (ignore, win) {
+        this.create_signal = global.display.connect('window-created', (ignore, win) => {
             dbg_log(`window created ${win}`);
 
-            connect_to_window(win);
+            this.connect_to_window(win);
         });
 
-        this.hide_signal = overview.connect('hidden', function() {
+        this.hide_signal = overview.connect('hidden', () => {
             // the focus might change whilst we're in the overview, i.e. by
             // searching for an already open app.
-            const win = get_focused_window();
+            const win = this.get_focused_window();
             if (win !== undefined) {
-                focus_changed(win)
+                this.focus_changed(win)
             }
         });
+
+        this.last_mouse_event = 0;
+        this.event_filter_id = Clutter.Event.add_filter(global.stage, this.event_filter.bind(this));
     }
 
     // REMINDER: It's required for extensions to clean up after themselves when
@@ -136,6 +164,11 @@ class Extension {
         if (this.hide_signal !== undefined) {
             overview.disconnect(this.hide_signal);
             this.hide_signal = undefined;
+        }
+
+        if (this.event_filter_id !== undefined) {
+            Clutter.Event.remove_filter(this.event_filter_id);
+            this.event_filter_id = undefined;
         }
 
         for (const actor of global.get_window_actors()) {
