@@ -47,7 +47,6 @@ function focus_changed(win) {
     if (actor) {
         let rect = win.get_buffer_rect();
 
-        let seat = Clutter.get_default_backend().get_default_seat();
         let [mouse_x, mouse_y, _] = global.get_pointer();
 
         if (cursor_within_window(mouse_x, mouse_y, win)) {
@@ -60,7 +59,13 @@ function focus_changed(win) {
             dbg_log('window too small, discarding event');
         } else {
             dbg_log('targeting new window');
-            seat.warp_pointer(rect.x + rect.width / 2, rect.y + rect.height / 2);
+            let seat = Clutter.get_default_backend().get_default_seat();
+            if (seat !== null) {
+                seat.warp_pointer(rect.x + rect.width / 2, rect.y + rect.height / 2);
+            }
+            else {
+                dbg_log('seat is null!');
+            }
         }
 
     }
@@ -77,18 +82,7 @@ function connect_to_window(win) {
 }
 
 function get_focused_window() {
-    for (const actor of global.get_window_actors()) {
-        if (actor.is_destroyed()) {
-            continue;
-        }
-
-        const win = actor.get_meta_window();
-        if (win.has_focus()) {
-            return win;
-        }
-    }
-
-    return undefined;
+    return global.display.focus_window;
 }
 
 class Extension {
@@ -117,7 +111,7 @@ class Extension {
             // the focus might change whilst we're in the overview, i.e. by
             // searching for an already open app.
             const win = get_focused_window();
-            if (win !== undefined) {
+            if (win !== null) {
                 focus_changed(win)
             }
         });
