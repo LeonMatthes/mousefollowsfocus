@@ -106,7 +106,7 @@ function win_shown(win) {
 // -----------
 
 function move_cursor(win) {
-    dbg_log('attempting to move cursor');
+    dbg_log(`attempting to move cursor to ${win}`);
     const actor = get_window_actor(win);
     if (actor) {
         let rect = win.get_buffer_rect();
@@ -209,6 +209,7 @@ class Extension {
             "Main.activateWindow": Main.activateWindow
           };
           Main.activateWindow = (window, ...args) => {
+            dbg_log(`'Main.activateWindow' triggered for ${win}`);
             move_cursor(window);
             this.origMethods["Main.activateWindow"](window, ...args);
           };
