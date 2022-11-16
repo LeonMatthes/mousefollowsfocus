@@ -238,7 +238,7 @@ class Extension {
             connect_to_window(win);
         });
 
-        this.focus_changed_signal = global.display.connect('notify::focus-window', function (ignore) {
+/*         this.focus_changed_signal = global.display.connect('notify::focus-window', function (ignore) {
             const win = get_focused_window();
             dbg_log(`Attaching to currently focused window: ${win}`);
             win._signal_size_changed = win.connect('size-changed', win_size_changed);
@@ -246,7 +246,7 @@ class Extension {
             // It'll try to move mouse in every single tick and cause gnome animation to stutter,
             // disabling it for now.
             //win._signal_position_changed = win.connect('position-changed', win_position_changed);
-        });
+        }); */
 
         this.hide_signal = overview.connect('hidden', function() {
             // ↑ the focus might change whilst we're in the overview, i.e. by
