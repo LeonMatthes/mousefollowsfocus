@@ -7,6 +7,8 @@ const EXT_NAME = `[${Me.metadata.name}]`;
 const Meta = imports.gi.Meta;
 const overview = imports.ui.main.overview;
 
+// Required to attach to `Main.activateWindow` aka monkey patching
+const Main = imports.ui.main;
 
 function get_window_actor(window) {
     for (const actor of global.get_window_actors()) {
@@ -19,10 +21,12 @@ function get_window_actor(window) {
 }
 
 function cursor_within_window(mouse_x, mouse_y, win) {
-    // use get_buffer_rect instead of get_frame_rect here, because the frame_rect may
-    // exclude shadows, which might already cause a focus-on-hover event, therefore causing
-    // the pointer to jump around eratically.
-    let rect = win.get_buffer_rect();
+    // > use get_buffer_rect instead of get_frame_rect here, because the frame_rect may
+    // > exclude shadows, which might already cause a focus-on-hover event, therefore causing
+    // > the pointer to jump around eratically.
+    // `get_frame_rect` is used again, because now the extension doesn't rely on arbitrary
+    // focus change event. So making the rect more precise helps with reducing mouse travel.
+    let rect = win.get_frame_rect();
 
     dbg_log(`window rect: ${rect.x}:${rect.y} - ${rect.width}:${rect.height}`);
 
@@ -41,9 +45,69 @@ function dbg_log(message) {
     }
 }
 
-function focus_changed(win) {
-    const actor = get_window_actor(win);
+// -----------
+// These are the replication of gnome-shell handling window attention
+function window_focus_signal_disconnect(win) {
+    dbg_log(`disconnecting from ${win} ('focus' signal)`);
+    if (win._mousefollowsfocus_extension_signal_focus) {
+        win.disconnect(win._mousefollowsfocus_extension_signal_focus);
+        delete win._mousefollowsfocus_extension_signal_focus;
+    }
+}
+
+function win_demands_attention(win) {
+    dbg_log('new window demands attention, assuming not in foreground, discarding it');
+    window_focus_signal_disconnect(win);
+    dbg_log(`disconnecting from ${win} ('notify::demands-attention' signal)`);
+    if (win._mousefollowsfocus_extension_signal_demands_attention) {
+        win.disconnect(win._mousefollowsfocus_extension_signal_demands_attention);
+        delete win._mousefollowsfocus_extension_signal_demands_attention;
+    }
+}
+
+function win_urgent(win) {
+    dbg_log('new window is in urgent, assuming not in foreground, discarding it');
+    window_focus_signal_disconnect(win);
+    dbg_log(`disconnecting from ${win} ('notify::urgent' signal)`);
+    if (win._mousefollowsfocus_extension_signal_urgent) {
+        win.disconnect(win._mousefollowsfocus_extension_signal_urgent);
+        delete win._mousefollowsfocus_extension_signal_urgent;
+    }
+}
+
+function win_focus_changed(win) {
     dbg_log('window focus event received');
+    move_cursor(win);
+    window_focus_signal_disconnect(win);
+}
+
+function win_unmanaged(win) {
+    dbg_log('new window is unmanaged, discarding it');
+    window_focus_signal_disconnect(win);
+    dbg_log(`disconnecting from ${win} ('unmanaged' signal)`);
+    if (win._mousefollowsfocus_extension_signal_unmanaged) {
+        win.disconnect(win._mousefollowsfocus_extension_signal_unmanaged);
+        delete win._mousefollowsfocus_extension_signal_unmanaged;
+    }
+}
+
+function win_shown(win) {
+    dbg_log('new window is shown without `focus`, `urgent` or `demands_attention`, probably due to gnome-shell restarted, discarding it');
+    if (win._mousefollowsfocus_extension_signal_focus) {
+        win.disconnect(win._mousefollowsfocus_extension_signal_focus);
+        delete win._mousefollowsfocus_extension_signal_focus;
+    }
+    if (win._mousefollowsfocus_extension_signal_unmanaged) {
+        win.disconnect(win._mousefollowsfocus_extension_signal_shown);
+        delete win._mousefollowsfocus_extension_signal_shown;
+    }
+}
+
+// -----------
+
+function move_cursor(win) {
+    dbg_log('attempting to move cursor');
+    const actor = get_window_actor(win);
     if (actor) {
         let rect = win.get_buffer_rect();
 
@@ -72,13 +136,43 @@ function focus_changed(win) {
 }
 
 function connect_to_window(win) {
-    const type = win.get_window_type();
-    if (type !== Meta.WindowType.NORMAL) {
-        dbg_log(`ignoring window, window type: ${type}`);
-        return;
+    // ↑ Read as: trigger mouse movement when the window is opened in foreground.
+
+    // ↓ Also includes DIALOG and MODAL_DIALOG in additional to NORMAL.
+    switch (win.get_window_type()) {
+        case Meta.WindowType.NORMAL: 
+            break;
+        case Meta.WindowType.DIALOG:
+            break;
+        case Meta.WindowType.MODAL_DIALOG:
+            break;
+        default:
+            dbg_log(`ignoring window, window type: ${type}`);
     }
 
-    win._mousefollowsfocus_extension_signal = win.connect('focus', focus_changed);
+    // This replicates the way gnome-shell handles window attention.
+    // Combining with the actual functions,
+    // only newly created window that has focus
+    // (not opened in the background)
+    // will cause mouse movement.
+    win._mousefollowsfocus_extension_signal_demands_attention = win.connect('notify::demands-attention', win_demands_attention);
+    win._mousefollowsfocus_extension_signal_urgent = win.connect('notify::urgent', win_urgent);
+    win._mousefollowsfocus_extension_signal_focus = win.connect('focus', win_focus_changed);
+    win._mousefollowsfocus_extension_signal_unmanaged = win.connect('unmanaged', win_unmanaged);
+    // `shown` isn't part of gnome-shell window attention handling
+    // However without it there will be an issue:
+    // When you restart gnome-shell, all windows are registered as recreation,
+    // but without `notify::demands-attention` or `notify::urgent` signal,
+    // this will cause the extension to stuck waiting for window's `focus`
+    // signal forever. You can observe this by:
+    // 1. switching to a new workspace using keyboard shortcut
+    // 2. restart gnome-shell
+    // 3. switch back (with keyboard) to previous workspace that has window
+    // 4. observe how extension tries to move the cursor, even though it's not
+    //    a newly created window (from user's perspective)
+    // `shown` doesn't trigger when a new window demanding attention is within
+    // the current workspace, which means other signals are still necessary.
+    win._mousefollowsfocus_extension_signal_shown = win.connect('shown', win_shown);
 }
 
 function get_focused_window() {
@@ -92,14 +186,32 @@ class Extension {
     enable() {
         dbg_log(`enabling ${Me.metadata.name}`);
 
-        for (const actor of global.get_window_actors()) {
-            if (actor.is_destroyed()) {
-                continue;
-            }
+        // These shouldn't be necessary anymore as it tries to attach to all
+        // existing windows but now we don't do that anymore because handling
+        // focus change is now done by three separate things:
+        // 1. Attaching to `Main.activateWindow` (used by Alt + Tab switcher and
+        //    many extensions, e.g. Dash to Dock, Dash to Panel)
+        // 2. Attaching to 'window-created' and only start acting when window is
+        //    opened in foreground
+        // 3. Attaching to overview's `hidden` signal, so that exiting Overviw
+        //    also triggers mouse movement
 
-            const win = actor.get_meta_window();
-            connect_to_window(win);
-        }
+        // for (const actor of global.get_window_actors()) {
+        //     if (actor.is_destroyed()) {
+        //         continue;
+        //     }
+
+        //     const win = actor.get_meta_window();
+        //     connect_to_window(win);
+        // }
+
+        this.origMethods = {
+            "Main.activateWindow": Main.activateWindow
+          };
+          Main.activateWindow = (window, ...args) => {
+            move_cursor(window);
+            this.origMethods["Main.activateWindow"](window, ...args);
+          };
 
         this.create_signal = global.display.connect('window-created', function (ignore, win) {
             dbg_log(`window created ${win}`);
@@ -112,7 +224,7 @@ class Extension {
             // searching for an already open app.
             const win = get_focused_window();
             if (win !== null) {
-                focus_changed(win)
+                move_cursor(win);
             }
         });
     }
@@ -121,6 +233,8 @@ class Extension {
     // they are disabled. This is required for approval during review!
     disable() {
         dbg_log(`disabling ${Me.metadata.name}`);
+
+        Main.activateWindow = this.origMethods["Main.activateWindow"];
 
         if (this.create_signal !== undefined) {
             global.display.disconnect(this.create_signal);
@@ -132,17 +246,35 @@ class Extension {
             this.hide_signal = undefined;
         }
 
-        for (const actor of global.get_window_actors()) {
+
+        // Do we really need these?
+        // Logically these signals shouldn't be persistent at all.
+        // Doing for loop can cause micro stutters on low-end device.
+        // And gnome-shell tends to disable all extensions on lockscreen,
+        // Then reenable then on unlock.
+/*         for (const actor of global.get_window_actors()) {
             if (actor.is_destroyed()) {
                 continue;
             }
 
             const win = actor.get_meta_window();
-            if (win._mousefollowsfocus_extension_signal) {
-                win.disconnect(win._mousefollowsfocus_extension_signal);
-                delete win._mousefollowsfocus_extension_signal;
+            if (win._mousefollowsfocus_extension_signal_demands_attention) {
+                win.disconnect(win._mousefollowsfocus_extension_signal_demands_attention);
+                delete win._mousefollowsfocus_extension_signal_demands_attention;
             }
-        }
+            if (win._mousefollowsfocus_extension_signal_urgent) {
+                win.disconnect(win._mousefollowsfocus_extension_signal_urgent);
+                delete win._mousefollowsfocus_extension_signal_urgent;
+            }
+            if (win._mousefollowsfocus_extension_signal_focus) {
+                win.disconnect(win._mousefollowsfocus_extension_signal_focus);
+                delete win._mousefollowsfocus_extension_signal_focus;
+            }
+            if (win._mousefollowsfocus_extension_signal_unmanaged) {
+                win.disconnect(win._mousefollowsfocus_extension_signal_unmanaged);
+                delete win._mousefollowsfocus_extension_signal_unmanaged;
+            }
+        } */
     }
 }
 
