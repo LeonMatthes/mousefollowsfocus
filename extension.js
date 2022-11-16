@@ -37,7 +37,7 @@ function cursor_within_window(mouse_x, mouse_y, win) {
 }
 
 // logging disabled by default
-const DEBUGGING = false;
+const DEBUGGING = true;
 
 function dbg_log(message) {
     if (DEBUGGING) {
@@ -118,7 +118,7 @@ function move_cursor(win) {
         } else if (overview.visible) {
             dbg_log('overview visible, discarding event');
         } else if (rect.width < 10 && rect.height < 10) {
-            // xdg-copy creates a 1x1 pixel window to capture mouse events.
+            // ↑ xdg-copy creates a 1x1 pixel window to capture mouse events.
             // Ignore this and similar windows.
             dbg_log('window too small, discarding event');
         } else {
@@ -150,7 +150,7 @@ function connect_to_window(win) {
             dbg_log(`ignoring window, window type: ${type}`);
     }
 
-    // This replicates the way gnome-shell handles window attention.
+    // ↓ This replicates the way gnome-shell handles window attention.
     // Combining with the actual functions,
     // only newly created window that has focus
     // (not opened in the background)
@@ -159,7 +159,7 @@ function connect_to_window(win) {
     win._mousefollowsfocus_extension_signal_urgent = win.connect('notify::urgent', win_urgent);
     win._mousefollowsfocus_extension_signal_focus = win.connect('focus', win_focus_changed);
     win._mousefollowsfocus_extension_signal_unmanaged = win.connect('unmanaged', win_unmanaged);
-    // `shown` isn't part of gnome-shell window attention handling
+    // ↓ `shown` isn't part of gnome-shell window attention handling
     // However without it there will be an issue:
     // When you restart gnome-shell, all windows are registered as recreation,
     // but without `notify::demands-attention` or `notify::urgent` signal,
@@ -179,6 +179,24 @@ function get_focused_window() {
     return global.display.focus_window;
 }
 
+function win_size_changed(win) {
+    dbg_log('Currently focused window has size change');
+    move_cursor(win);
+    if (win._signal_size_changed) {
+        win.disconnect(win._signal_size_changed);
+        delete win._signal_size_changed;
+    }
+}
+
+function win_position_changed(win) {
+    dbg_log('Currently focused window has position change');
+    move_cursor(win);
+    if (win._signal_position_changed) {
+        win.disconnect(win._signal_position_changed);
+        delete win._signal_position_changed;
+    }
+}
+
 class Extension {
     constructor() {
     }
@@ -186,7 +204,7 @@ class Extension {
     enable() {
         dbg_log(`enabling ${Me.metadata.name}`);
 
-        // These shouldn't be necessary anymore as it tries to attach to all
+        // ↓ These shouldn't be necessary anymore as it tries to attach to all
         // existing windows but now we don't do that anymore because handling
         // focus change is now done by three separate things:
         // 1. Attaching to `Main.activateWindow` (used by Alt + Tab switcher and
@@ -208,10 +226,10 @@ class Extension {
         this.origMethods = {
             "Main.activateWindow": Main.activateWindow
           };
-          Main.activateWindow = (window, ...args) => {
+          Main.activateWindow = (win, ...args) => {
             dbg_log(`'Main.activateWindow' triggered for ${win}`);
-            move_cursor(window);
-            this.origMethods["Main.activateWindow"](window, ...args);
+            move_cursor(win);
+            this.origMethods["Main.activateWindow"](win, ...args);
           };
 
         this.create_signal = global.display.connect('window-created', function (ignore, win) {
@@ -220,8 +238,18 @@ class Extension {
             connect_to_window(win);
         });
 
+        this.focus_changed_signal = global.display.connect('notify::focus-window', function (ignore) {
+            const win = get_focused_window();
+            dbg_log(`Attaching to currently focused window: ${win}`);
+            win._signal_size_changed = win.connect('size-changed', win_size_changed);
+            // ↓ Nope, this is too laggy:
+            // It'll try to move mouse in every single tick and cause gnome animation to stutter,
+            // disabling it for now.
+            //win._signal_position_changed = win.connect('position-changed', win_position_changed);
+        });
+
         this.hide_signal = overview.connect('hidden', function() {
-            // the focus might change whilst we're in the overview, i.e. by
+            // ↑ the focus might change whilst we're in the overview, i.e. by
             // searching for an already open app.
             const win = get_focused_window();
             if (win !== null) {
@@ -242,13 +270,18 @@ class Extension {
             this.create_signal = undefined;
         }
 
+        if (this.focus_changed_signal !== undefined) {
+            global.display.disconnect(this.focus_changed_signal);
+            this.focus_changed_signal = undefined;
+        }
+
         if (this.hide_signal !== undefined) {
             overview.disconnect(this.hide_signal);
             this.hide_signal = undefined;
         }
 
 
-        // Do we really need these?
+        // ↓ Do we really need these?
         // Logically these signals shouldn't be persistent at all.
         // Doing for loop can cause micro stutters on low-end device.
         // And gnome-shell tends to disable all extensions on lockscreen,
