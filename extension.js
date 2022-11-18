@@ -149,6 +149,7 @@ function connect_to_window(win) {
             break;
         default:
             dbg_log(`ignoring window, window type: ${type}`);
+            return;
     }
 
     // ↓ This replicates the way gnome-shell handles window attention.
