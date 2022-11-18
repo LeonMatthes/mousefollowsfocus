@@ -25,7 +25,7 @@ function cursor_within_window(mouse_x, mouse_y, win) {
     // > exclude shadows, which might already cause a focus-on-hover event, therefore causing
     // > the pointer to jump around eratically.
     // `get_frame_rect` is used again, because now the extension doesn't rely on arbitrary
-    // focus change event. So making the rect more precise helps with reducing mouse travel.
+    // focus change event. So making the rect more precise helps with reducing mouse travel distance.
     const cursor_rect = new Meta.Rectangle({ x: mouse_x, y: mouse_y, width: 1, height: 1 });
     return cursor_rect.intersect(win.get_frame_rect())[0];
 
