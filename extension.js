@@ -50,17 +50,14 @@ function dbg_log(message) {
     }
 }
 
-// -----------
-// These are the replication of gnome-shell handling window attention
-
-async function signal_disconnect_and_delete(obj, signal) {
+function signal_disconnect_and_delete(obj, signal) {
     if (signal) {
         obj.disconnect(signal);
         delete signal;
     }
 }
 
-async function signal_disconnect_and_undefine(obj, signal) {
+function signal_disconnect_and_undefine(obj, signal) {
     if (signal !== undefined) {
         obj.disconnect(signal);
         signal = undefined;
@@ -70,6 +67,9 @@ async function signal_disconnect_and_undefine(obj, signal) {
 function win_focus_signal_disconnect_and_delete(win) {
     signal_disconnect_and_delete(win, win._mousefollowsfocus_extension_signal_focus);
 }
+
+// -----------
+// These are the replication of gnome-shell handling window attention
 
 function win_demands_attention(win) {
     dbg_log('new window demands attention, assuming not in foreground, discarding it');
