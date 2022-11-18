@@ -10,7 +10,8 @@ const overview = imports.ui.main.overview;
 // Required to attach to `Main.activateWindow` aka monkey patching
 const Main = imports.ui.main;
 
-function get_window_actor(window) {
+// ↓ Not used anymore, also `for` loop isn't great on performance
+/* function get_window_actor(window) {
     for (const actor of global.get_window_actors()) {
         if (!actor.is_destroyed() && actor.get_meta_window() === window) {
             return actor;
@@ -18,16 +19,16 @@ function get_window_actor(window) {
     }
 
     return undefined;
-}
+} */
 
-function cursor_within_window(mouse_x, mouse_y, win) {
+function cursor_within_rect(mouse_x, mouse_y, rect) {
     // > use get_buffer_rect instead of get_frame_rect here, because the frame_rect may
     // > exclude shadows, which might already cause a focus-on-hover event, therefore causing
     // > the pointer to jump around eratically.
     // `get_frame_rect` is used again, because now the extension doesn't rely on arbitrary
     // focus change event. So making the rect more precise helps with reducing mouse travel distance.
     const cursor_rect = new Meta.Rectangle({ x: mouse_x, y: mouse_y, width: 1, height: 1 });
-    return cursor_rect.intersect(win.get_frame_rect())[0];
+    return cursor_rect.intersect(rect)[0];
 
 /*     let rect = win.get_frame_rect();
 
@@ -108,31 +109,25 @@ function win_shown(win) {
 
 function move_cursor(win) {
     dbg_log(`attempting to move cursor to ${win}`);
-    const actor = get_window_actor(win);
-    if (actor) {
-        let rect = win.get_buffer_rect();
-
-        let [mouse_x, mouse_y, _] = global.get_pointer();
-
-        if (cursor_within_window(mouse_x, mouse_y, win)) {
-            dbg_log('pointer within window, discarding event');
-        } else if (overview.visible) {
-            dbg_log('overview visible, discarding event');
-        } else if (rect.width < 10 && rect.height < 10) {
-            // ↑ xdg-copy creates a 1x1 pixel window to capture mouse events.
-            // Ignore this and similar windows.
-            dbg_log('window too small, discarding event');
-        } else {
-            dbg_log('targeting new window');
-            let seat = Clutter.get_default_backend().get_default_seat();
-            if (seat !== null) {
-                seat.warp_pointer(rect.x + rect.width / 2, rect.y + rect.height / 2);
-            }
-            else {
-                dbg_log('seat is null!');
-            }
+    let rect = win.get_buffer_rect();
+    let [mouse_x, mouse_y, _] = global.get_pointer();
+    if (cursor_within_rect(mouse_x, mouse_y, rect)) {
+        dbg_log('pointer within window, discarding event');
+    } else if (overview.visible) {
+        dbg_log('overview visible, discarding event');
+    } else if (rect.width < 10 && rect.height < 10) {
+        // ↑ xdg-copy creates a 1x1 pixel window to capture mouse events.
+        // Ignore this and similar windows.
+        dbg_log('window too small, discarding event');
+    } else {
+        dbg_log('targeting new window');
+        let seat = Clutter.get_default_backend().get_default_seat();
+        if (seat !== null) {
+            seat.warp_pointer(rect.x + rect.width / 2, rect.y + rect.height / 2);
         }
-
+        else {
+            dbg_log('seat is null!');
+        }
     }
 }
 
@@ -285,7 +280,7 @@ class Extension {
 
         // ↓ Do we really need these?
         // Logically these signals shouldn't be persistent at all.
-        // Doing for loop can cause micro stutters on low-end device.
+        // Doing `for` loop can cause micro stutters on low-end device.
         // And gnome-shell tends to disable all extensions on lockscreen,
         // Then reenable then on unlock.
 /*         for (const actor of global.get_window_actors()) {
