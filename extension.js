@@ -47,7 +47,7 @@ function dbg_log(message) {
 
 // -----------
 // These are the replication of gnome-shell handling window attention
-function window_focus_signal_disconnect(win) {
+function win_focus_signal_disconnect(win) {
     dbg_log(`disconnecting from ${win} ('focus' signal)`);
     if (win._mousefollowsfocus_extension_signal_focus) {
         win.disconnect(win._mousefollowsfocus_extension_signal_focus);
@@ -57,7 +57,7 @@ function window_focus_signal_disconnect(win) {
 
 function win_demands_attention(win) {
     dbg_log('new window demands attention, assuming not in foreground, discarding it');
-    window_focus_signal_disconnect(win);
+    win_focus_signal_disconnect(win);
     dbg_log(`disconnecting from ${win} ('notify::demands-attention' signal)`);
     if (win._mousefollowsfocus_extension_signal_demands_attention) {
         win.disconnect(win._mousefollowsfocus_extension_signal_demands_attention);
@@ -67,7 +67,7 @@ function win_demands_attention(win) {
 
 function win_urgent(win) {
     dbg_log('new window is in urgent, assuming not in foreground, discarding it');
-    window_focus_signal_disconnect(win);
+    win_focus_signal_disconnect(win);
     dbg_log(`disconnecting from ${win} ('notify::urgent' signal)`);
     if (win._mousefollowsfocus_extension_signal_urgent) {
         win.disconnect(win._mousefollowsfocus_extension_signal_urgent);
@@ -78,12 +78,12 @@ function win_urgent(win) {
 function win_focus_changed(win) {
     dbg_log('window focus event received');
     move_cursor(win);
-    window_focus_signal_disconnect(win);
+    win_focus_signal_disconnect(win);
 }
 
 function win_unmanaged(win) {
     dbg_log('new window is unmanaged, discarding it');
-    window_focus_signal_disconnect(win);
+    win_focus_signal_disconnect(win);
     dbg_log(`disconnecting from ${win} ('unmanaged' signal)`);
     if (win._mousefollowsfocus_extension_signal_unmanaged) {
         win.disconnect(win._mousefollowsfocus_extension_signal_unmanaged);
@@ -137,9 +137,10 @@ function move_cursor(win) {
 
 function connect_to_window(win) {
     // ↑ Read as: trigger mouse movement when the window is opened in foreground.
-
+    // ↓ Store window type to avoid calling it twice
+    const type = win.get_window_type();
     // ↓ Also includes DIALOG and MODAL_DIALOG in additional to NORMAL.
-    switch (win.get_window_type()) {
+    switch (type) {
         case Meta.WindowType.NORMAL: 
             break;
         case Meta.WindowType.DIALOG:
@@ -234,13 +235,7 @@ class Extension {
 
         this.create_signal = global.display.connect('window-created', function (ignore, win) {
             dbg_log(`window created ${win}`);
-            if (win) {
-                // ↑ without the `if (win)` sometimes journalctl shows this errors:
-                // JS ERROR: ReferenceError: type is not defined
-                // connect_to_window@.../mousefollowsfocus@matthes.biz/extension.js:150:54
-                // enable/this.create_signal<@.../mousefollowsfocus@matthes.biz/extension.js:238:30
-                connect_to_window(win);
-            }
+            connect_to_window(win);
         });
 
 /*         this.focus_changed_signal = global.display.connect('notify::focus-window', function (ignore) {
