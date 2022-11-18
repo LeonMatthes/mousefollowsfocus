@@ -52,32 +52,30 @@ function dbg_log(message) {
 
 // -----------
 // These are the replication of gnome-shell handling window attention
-function win_focus_signal_disconnect(win) {
-    dbg_log(`disconnecting from ${win} ('focus' signal)`);
-    if (win._mousefollowsfocus_extension_signal_focus) {
-        win.disconnect(win._mousefollowsfocus_extension_signal_focus);
-        delete win._mousefollowsfocus_extension_signal_focus;
+
+function signal_disconnect(win, signal) {
+    if (signal) {
+        win.disconnect(signal);
+        delete signal;
     }
+}
+
+function win_focus_signal_disconnect(win) {
+    signal_disconnect(win, win._mousefollowsfocus_extension_signal_focus);
 }
 
 function win_demands_attention(win) {
     dbg_log('new window demands attention, assuming not in foreground, discarding it');
     win_focus_signal_disconnect(win);
     dbg_log(`disconnecting from ${win} ('notify::demands-attention' signal)`);
-    if (win._mousefollowsfocus_extension_signal_demands_attention) {
-        win.disconnect(win._mousefollowsfocus_extension_signal_demands_attention);
-        delete win._mousefollowsfocus_extension_signal_demands_attention;
-    }
+    signal_disconnect(win, win._mousefollowsfocus_extension_signal_demands_attention);
 }
 
 function win_urgent(win) {
     dbg_log('new window is in urgent, assuming not in foreground, discarding it');
     win_focus_signal_disconnect(win);
     dbg_log(`disconnecting from ${win} ('notify::urgent' signal)`);
-    if (win._mousefollowsfocus_extension_signal_urgent) {
-        win.disconnect(win._mousefollowsfocus_extension_signal_urgent);
-        delete win._mousefollowsfocus_extension_signal_urgent;
-    }
+    signal_disconnect(win, win._mousefollowsfocus_extension_signal_urgent);
 }
 
 function win_focus_changed(win) {
@@ -90,20 +88,14 @@ function win_unmanaged(win) {
     dbg_log('new window is unmanaged, discarding it');
     win_focus_signal_disconnect(win);
     dbg_log(`disconnecting from ${win} ('unmanaged' signal)`);
-    if (win._mousefollowsfocus_extension_signal_unmanaged) {
-        win.disconnect(win._mousefollowsfocus_extension_signal_unmanaged);
-        delete win._mousefollowsfocus_extension_signal_unmanaged;
-    }
+    signal_disconnect(win, win._mousefollowsfocus_extension_signal_unmanaged);
 }
 
 function win_shown(win) {
     dbg_log('new window is shown without `focus`, `urgent` or `demands_attention`, probably due to gnome-shell restarted, discarding it');
-    win_focus_signal_disconnect(win);
+    signal_disconnect(win, win._mousefollowsfocus_extension_signal_focus);
     dbg_log(`disconnecting from ${win} ('shown' signal)`);
-    if (win._mousefollowsfocus_extension_signal_unmanaged) {
-        win.disconnect(win._mousefollowsfocus_extension_signal_shown);
-        delete win._mousefollowsfocus_extension_signal_shown;
-    }
+    signal_disconnect(win, win._mousefollowsfocus_extension_signal_shown);
 }
 
 // -----------
