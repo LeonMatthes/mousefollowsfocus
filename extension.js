@@ -172,19 +172,13 @@ function get_focused_window() {
 function win_size_changed(win) {
     dbg_log('Currently focused window has size change');
     move_cursor(win);
-    if (win._signal_size_changed) {
-        win.disconnect(win._signal_size_changed);
-        delete win._signal_size_changed;
-    }
+    signal_disconnect(win, win._mousefollowsfocus_extension_signal_size_changed);
 }
 
 function win_position_changed(win) {
     dbg_log('Currently focused window has position change');
     move_cursor(win);
-    if (win._signal_position_changed) {
-        win.disconnect(win._signal_position_changed);
-        delete win._signal_position_changed;
-    }
+    signal_disconnect(win, win._mousefollowsfocus_extension_signal_position_changed);
 }
 
 class Extension {
@@ -230,11 +224,11 @@ class Extension {
 /*         this.focus_changed_signal = global.display.connect('notify::focus-window', function (ignore) {
             const win = get_focused_window();
             dbg_log(`Attaching to currently focused window: ${win}`);
-            win._signal_size_changed = win.connect('size-changed', win_size_changed);
+            win._mousefollowsfocus_extension_signal_size_changed = win.connect('size-changed', win_size_changed);
             // ↓ Nope, this is too laggy:
             // It'll try to move mouse in every single tick and cause gnome animation to stutter,
             // disabling it for now.
-            //win._signal_position_changed = win.connect('position-changed', win_position_changed);
+            //win._mousefollowsfocus_extension_signal_position_changed = win.connect('position-changed', win_position_changed);
         }); */
 
         this.hide_signal = overview.connect('hidden', function() {
