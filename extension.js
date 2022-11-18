@@ -53,54 +53,61 @@ function dbg_log(message) {
 // -----------
 // These are the replication of gnome-shell handling window attention
 
-function signal_disconnect(win, signal) {
+async function signal_disconnect_and_delete(obj, signal) {
     if (signal) {
-        win.disconnect(signal);
+        obj.disconnect(signal);
         delete signal;
     }
 }
 
-function win_focus_signal_disconnect(win) {
-    signal_disconnect(win, win._mousefollowsfocus_extension_signal_focus);
+async function signal_disconnect_and_undefine(obj, signal) {
+    if (signal !== undefined) {
+        obj.disconnect(signal);
+        signal = undefined;
+    }
+}
+
+function win_focus_signal_disconnect_and_delete(win) {
+    signal_disconnect_and_delete(win, win._mousefollowsfocus_extension_signal_focus);
 }
 
 function win_demands_attention(win) {
     dbg_log('new window demands attention, assuming not in foreground, discarding it');
-    win_focus_signal_disconnect(win);
+    win_focus_signal_disconnect_and_delete(win);
     dbg_log(`disconnecting from ${win} ('notify::demands-attention' signal)`);
-    signal_disconnect(win, win._mousefollowsfocus_extension_signal_demands_attention);
+    signal_disconnect_and_delete(win, win._mousefollowsfocus_extension_signal_demands_attention);
 }
 
 function win_urgent(win) {
     dbg_log('new window is in urgent, assuming not in foreground, discarding it');
-    win_focus_signal_disconnect(win);
+    win_focus_signal_disconnect_and_delete(win);
     dbg_log(`disconnecting from ${win} ('notify::urgent' signal)`);
-    signal_disconnect(win, win._mousefollowsfocus_extension_signal_urgent);
+    signal_disconnect_and_delete(win, win._mousefollowsfocus_extension_signal_urgent);
 }
 
 function win_focus_changed(win) {
     dbg_log('window focus event received');
     move_cursor(win);
-    win_focus_signal_disconnect(win);
+    win_focus_signal_disconnect_and_delete(win);
 }
 
 function win_unmanaged(win) {
     dbg_log('new window is unmanaged, discarding it');
-    win_focus_signal_disconnect(win);
+    win_focus_signal_disconnect_and_delete(win);
     dbg_log(`disconnecting from ${win} ('unmanaged' signal)`);
-    signal_disconnect(win, win._mousefollowsfocus_extension_signal_unmanaged);
+    signal_disconnect_and_delete(win, win._mousefollowsfocus_extension_signal_unmanaged);
 }
 
 function win_shown(win) {
     dbg_log('new window is shown without `focus`, `urgent` or `demands_attention`, probably due to gnome-shell restarted, discarding it');
-    signal_disconnect(win, win._mousefollowsfocus_extension_signal_focus);
+    signal_disconnect_and_delete(win, win._mousefollowsfocus_extension_signal_focus);
     dbg_log(`disconnecting from ${win} ('shown' signal)`);
-    signal_disconnect(win, win._mousefollowsfocus_extension_signal_shown);
+    signal_disconnect_and_delete(win, win._mousefollowsfocus_extension_signal_shown);
 }
 
 // -----------
 
-function move_cursor(win) {
+async function move_cursor(win) {
     dbg_log(`attempting to move cursor to ${win}`);
     let rect = win.get_buffer_rect();
     if (cursor_within_rect(rect)) {
@@ -172,13 +179,13 @@ function get_focused_window() {
 function win_size_changed(win) {
     dbg_log('Currently focused window has size change');
     move_cursor(win);
-    signal_disconnect(win, win._mousefollowsfocus_extension_signal_size_changed);
+    signal_disconnect_and_delete(win, win._mousefollowsfocus_extension_signal_size_changed);
 }
 
 function win_position_changed(win) {
     dbg_log('Currently focused window has position change');
     move_cursor(win);
-    signal_disconnect(win, win._mousefollowsfocus_extension_signal_position_changed);
+    signal_disconnect_and_delete(win, win._mousefollowsfocus_extension_signal_position_changed);
 }
 
 class Extension {
@@ -245,24 +252,10 @@ class Extension {
     // they are disabled. This is required for approval during review!
     disable() {
         dbg_log(`disabling ${Me.metadata.name}`);
-
         Main.activateWindow = this.origMethods["Main.activateWindow"];
-
-        if (this.create_signal !== undefined) {
-            global.display.disconnect(this.create_signal);
-            this.create_signal = undefined;
-        }
-
-        if (this.focus_changed_signal !== undefined) {
-            global.display.disconnect(this.focus_changed_signal);
-            this.focus_changed_signal = undefined;
-        }
-
-        if (this.hide_signal !== undefined) {
-            overview.disconnect(this.hide_signal);
-            this.hide_signal = undefined;
-        }
-
+        signal_disconnect_and_undefine(global.display, this.create_signal);
+        signal_disconnect_and_undefine(global.display, this.focus_changed_signal);
+        signal_disconnect_and_undefine(overview, this.hide_signal);
 
         // ↓ Do we really need these?
         // Logically these signals shouldn't be persistent at all.
