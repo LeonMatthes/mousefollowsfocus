@@ -37,7 +37,7 @@ function cursor_within_window(mouse_x, mouse_y, win) {
 }
 
 // logging disabled by default
-const DEBUGGING = true;
+const DEBUGGING = false;
 
 function dbg_log(message) {
     if (DEBUGGING) {
@@ -214,14 +214,14 @@ class Extension {
         // 3. Attaching to overview's `hidden` signal, so that exiting Overviw
         //    also triggers mouse movement
 
-        // for (const actor of global.get_window_actors()) {
-        //     if (actor.is_destroyed()) {
-        //         continue;
-        //     }
+/*         for (const actor of global.get_window_actors()) {
+            if (actor.is_destroyed()) {
+                continue;
+            }
 
-        //     const win = actor.get_meta_window();
-        //     connect_to_window(win);
-        // }
+            const win = actor.get_meta_window();
+            connect_to_window(win);
+        } */
 
         this.origMethods = {
             "Main.activateWindow": Main.activateWindow
@@ -234,8 +234,13 @@ class Extension {
 
         this.create_signal = global.display.connect('window-created', function (ignore, win) {
             dbg_log(`window created ${win}`);
-
-            connect_to_window(win);
+            if (win) {
+                // ↑ without the `if (win)` sometimes journalctl shows this errors:
+                // JS ERROR: ReferenceError: type is not defined
+                // connect_to_window@.../mousefollowsfocus@matthes.biz/extension.js:150:54
+                // enable/this.create_signal<@.../mousefollowsfocus@matthes.biz/extension.js:238:30
+                connect_to_window(win);
+            }
         });
 
 /*         this.focus_changed_signal = global.display.connect('notify::focus-window', function (ignore) {
