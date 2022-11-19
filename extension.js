@@ -22,11 +22,6 @@ const Main = imports.ui.main;
 } */
 
 function cursor_within_rect(rect) {
-    // > use get_buffer_rect instead of get_frame_rect here, because the frame_rect may
-    // > exclude shadows, which might already cause a focus-on-hover event, therefore causing
-    // > the pointer to jump around eratically.
-    // `get_frame_rect` is used again, because now the extension doesn't rely on arbitrary
-    // focus change event. So making the rect more precise helps with reducing mouse travel distance.
     let [mouse_x, mouse_y, _] = global.get_pointer();
     const cursor_rect = new Meta.Rectangle({ x: mouse_x, y: mouse_y, width: 1, height: 1 });
     return cursor_rect.intersect(rect)[0];
@@ -109,7 +104,12 @@ function win_shown(win) {
 
 async function move_cursor(win) {
     dbg_log(`attempting to move cursor to ${win}`);
-    let rect = win.get_buffer_rect();
+    // > use get_buffer_rect instead of get_frame_rect here, because the frame_rect may
+    // > exclude shadows, which might already cause a focus-on-hover event, therefore causing
+    // > the pointer to jump around eratically.
+    // `get_frame_rect` is used again, because now the extension doesn't rely on arbitrary
+    // focus change event. So making the rect more precise helps with reducing mouse travel distance.
+    let rect = win.get_frame_rect();
     if (cursor_within_rect(rect)) {
         dbg_log('pointer within window, discarding event');
     } else if (overview.visible) {
