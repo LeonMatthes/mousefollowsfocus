@@ -41,6 +41,20 @@ function dbg_log(message) {
     }
 }
 
+function focus_store_last_position(win, mouse_x, mouse_y) {
+    if (win != null) {
+        let rect2 = win.get_buffer_rect();
+        if (cursor_within_window(mouse_x, mouse_y, win)) {
+            let px = mouse_x - rect2.x;
+            let py = mouse_y - rect2.y;
+            if (px > 0 && py > 0) {
+                let wt = win.get_title();
+                dbg_log(`storing previous position (${px},${py}) of window: ${wt}`);
+                win._mousefollowsfocus_last_position = [px, py];
+            }
+        }
+    }
+}
 
 function focus_warp_pointer(win, mouse_x, mouse_y) {
     let wt = win.get_title();
@@ -48,14 +62,26 @@ function focus_warp_pointer(win, mouse_x, mouse_y) {
 
     let seat = Clutter.get_default_backend().get_default_seat();
     if (seat !== null) {
-        let nx = rect.x + rect.width / 2;
-        let ny = rect.y + rect.height / 2;
-        dbg_log(`targeting new position at middle (${nx},${ny}) of window: ${wt}`);
-        seat.warp_pointer(nx, ny);
+        if (win._mousefollowsfocus_last_position) {
+            let wx = win._mousefollowsfocus_last_position[0];
+            let wy = win._mousefollowsfocus_last_position[1];
+            let sx = wx + rect.x;
+            let sy = wy + rect.y;
+            dbg_log(`moving mouse from (${mouse_x},${mouse_y}) to previous position (${sx},${sy}) inside window: ${wt}`);
+            seat.warp_pointer(sx, sy);
+        } else {
+            let nx = rect.x + rect.width / 2;
+            let ny = rect.y + rect.height / 2;
+            dbg_log(`targeting new position at middle (${nx},${ny}) of window: ${wt}`);
+            seat.warp_pointer(nx, ny);
+        }
     } else {
         dbg_log(`focus_changed: seat is null for window: ${wt}`);
     }
 }
+
+let _last_win = null;
+
 function focus_changed(win) {
     let wt = win.get_title();
     dbg_log(`focus_changed: window focus event received from : ${wt}`);
@@ -63,8 +89,10 @@ function focus_changed(win) {
     const actor = get_window_actor(win);
     if (actor) {
         let rect = win.get_buffer_rect();
-        
+
         let [mouse_x, mouse_y, _] = global.get_pointer();
+
+        focus_store_last_position(_last_win, mouse_x, mouse_y);
 
         if (cursor_within_window(mouse_x, mouse_y, win)) {
             dbg_log(`pointer within window, discarding event of window: ${wt}`);
@@ -76,8 +104,8 @@ function focus_changed(win) {
             dbg_log(`window too small, discarding event of window: ${wt}`);
         } else {
             focus_warp_pointer(win, mouse_x, mouse_y);
-            }
-            }
+        }
+    }
     dbg_log(`focus_changed: window focus event processed for: ${wt}`);
 }
 
