@@ -41,6 +41,21 @@ function dbg_log(message) {
     }
 }
 
+
+function focus_warp_pointer(win, mouse_x, mouse_y) {
+    let wt = win.get_title();
+    let rect = win.get_buffer_rect();
+
+    let seat = Clutter.get_default_backend().get_default_seat();
+    if (seat !== null) {
+        let nx = rect.x + rect.width / 2;
+        let ny = rect.y + rect.height / 2;
+        dbg_log(`targeting new position at middle (${nx},${ny}) of window: ${wt}`);
+        seat.warp_pointer(nx, ny);
+    } else {
+        dbg_log(`focus_changed: seat is null for window: ${wt}`);
+    }
+}
 function focus_changed(win) {
     let wt = win.get_title();
     dbg_log(`focus_changed: window focus event received from : ${wt}`);
@@ -60,17 +75,10 @@ function focus_changed(win) {
             // Ignore this and similar windows.
             dbg_log(`window too small, discarding event of window: ${wt}`);
         } else {
-            dbg_log('targeting new window');
-            let seat = Clutter.get_default_backend().get_default_seat();
-            if (seat !== null) {
-                seat.warp_pointer(rect.x + rect.width / 2, rect.y + rect.height / 2);
+            focus_warp_pointer(win, mouse_x, mouse_y);
             }
-            else {
-                dbg_log('seat is null!');
             }
-        }
-
-    }
+    dbg_log(`focus_changed: window focus event processed for: ${wt}`);
 }
 
 function connect_to_window(win) {
