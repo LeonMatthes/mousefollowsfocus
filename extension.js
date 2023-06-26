@@ -24,7 +24,7 @@ function cursor_within_window(mouse_x, mouse_y, win) {
     // the pointer to jump around eratically.
     let rect = win.get_buffer_rect();
 
-    dbg_log(`window rect: ${rect.x}:${rect.y} - ${rect.width}:${rect.height}`);
+    dbg_log(`window at: (${rect.x},${rect.y}) window size: ${rect.width}x${rect.height} mouse at: (${mouse_x},${mouse_y})`);
 
     return mouse_x >= rect.x &&
         mouse_x <= rect.x + rect.width &&
@@ -42,21 +42,23 @@ function dbg_log(message) {
 }
 
 function focus_changed(win) {
+    let wt = win.get_title();
+    dbg_log(`focus_changed: window focus event received from : ${wt}`);
+
     const actor = get_window_actor(win);
-    dbg_log('window focus event received');
     if (actor) {
         let rect = win.get_buffer_rect();
-
+        
         let [mouse_x, mouse_y, _] = global.get_pointer();
 
         if (cursor_within_window(mouse_x, mouse_y, win)) {
-            dbg_log('pointer within window, discarding event');
+            dbg_log(`pointer within window, discarding event of window: ${wt}`);
         } else if (overview.visible) {
-            dbg_log('overview visible, discarding event');
+            dbg_log(`overview visible, discarding event of window: ${wt}`);
         } else if (rect.width < 10 && rect.height < 10) {
             // xdg-copy creates a 1x1 pixel window to capture mouse events.
             // Ignore this and similar windows.
-            dbg_log('window too small, discarding event');
+            dbg_log(`window too small, discarding event of window: ${wt}`);
         } else {
             dbg_log('targeting new window');
             let seat = Clutter.get_default_backend().get_default_seat();
@@ -102,12 +104,13 @@ class Extension {
         }
 
         this.create_signal = global.display.connect('window-created', function (ignore, win) {
-            dbg_log(`window created ${win}`);
+            let wt = win.get_title();
+            dbg_log(`window created: ${wt}, ignore: ${ignore}`);
 
             connect_to_window(win);
         });
 
-        this.hide_signal = overview.connect('hidden', function() {
+        this.hide_signal = overview.connect('hidden', function () {
             // the focus might change whilst we're in the overview, i.e. by
             // searching for an already open app.
             const win = get_focused_window();
