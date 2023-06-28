@@ -105,6 +105,7 @@ function focus_changed(win) {
         } else {
             focus_warp_pointer(win, mouse_x, mouse_y);
         }
+        _last_win = win;
     }
     dbg_log(`focus_changed: window focus event processed for: ${wt}`);
 }
