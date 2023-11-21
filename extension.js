@@ -101,7 +101,7 @@ function cursor_within_window(mouse_x, mouse_y, win) {
 
 function dbg_log(message) {
     if (DEBUGGING) {
-        log(EXT_NAME, message);
+        console.log(EXT_NAME, message);
     }
 }
 
