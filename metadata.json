@@ -2,7 +2,7 @@
     "name": "Mouse Follows Focus",
     "description": "Are you a power-user?\nDo you like using Super+1,2,3 to access your favorite apps?\nAre you annoyed that you have to manually move your mouse between screens because it can't keep up with your keyboard shortcuts?\nThen this extension is for you!\n\nThis simple GNOME shell extension does the opposite of the 'focus follows mouse' setting. It makes the mouse follow your keyboard focus. Whenever you focus a window, if the cursor isn't already in it, it will jump to the windows center, making it easy to interact with it.",
     "uuid": "mousefollowsfocus@matthes.biz",
-    "shell-version": ["45", "46", "47"],
+    "shell-version": ["45", "46", "47", "48"],
     "version": 8,
     "url": "https://github.com/LeonMatthes/mousefollowsfocus"
 }
